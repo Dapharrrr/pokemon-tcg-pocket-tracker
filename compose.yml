@@ -1,0 +1,49 @@
+# docker-compose.yml
+# Orchestrates multiple containers as a single application
+
+version: "3.9"
+
+services:
+  # ─── PostgreSQL Database ────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: pokemon_tcg_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Named volume: data persists even if container is destroyed
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Docker will check if PostgreSQL is ready before starting the app
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─── Next.js Application ───────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pokemon_tcg_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT:-5432}/${POSTGRES_DB}?schema=public"
+      # Note: "db" here refers to the service name above.
+      # Docker Compose creates an internal network where services
+      # can reach each other by name.
+    depends_on:
+      db:
+        condition: service_healthy
+        # Wait for the database healthcheck to pass before starting
+
+volumes:
+  postgres_data:
+    # Docker manages this volume. It persists across container restarts.
