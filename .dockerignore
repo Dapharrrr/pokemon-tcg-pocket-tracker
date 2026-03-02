@@ -1,0 +1,11 @@
+# .dockerignore
+# Like .gitignore but for Docker. Files listed here won't be
+# copied into the container, making builds faster and images smaller.
+
+node_modules
+.next
+.git
+.gitignore
+README.md
+docker-compose.yml
+.env.local
