@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Expansion {
+  id          String   @id @default(cuid())
+  name        String   @unique        // e.g., "Genetic Apex"
+  slug        String   @unique        // e.g., "genetic-apex" (for URLs)
+  setCode     String   @unique        // e.g., "A1" (official set code for image URLs)
+  releaseDate DateTime
+  imageUrl    String?                 // Optional: expansion logo
+
+  // Relations
+  packs       Pack[]                  // One expansion has many packs
+  cards       Card[]                  // One expansion has many cards
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // @@index creates a database index for faster lookups
+  @@index([slug])
+}
+
+model Pack {
+  id          String    @id @default(cuid())
+  name        String                  // e.g., "Mewtwo Pack"
+  slug        String                  // e.g., "mewtwo-pack"
+  imageUrl    String?                 // Pack artwork
+  color       String?                 // For UI theming, e.g., "#7C3AED"
+
+  expansionId String
+  expansion   Expansion @relation(fields: [expansionId], references: [id])
+  cards       CardPack[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([expansionId, slug])       // Unique within an expansion
+  @@index([expansionId])
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  name        String                  // e.g., "Pikachu"
+  number      Int                     // Card number in the set
+  rarity      Rarity                  // Enum (see below)
+  type        CardType?               // Pokémon type (Fire, Water, etc.)
+  hp          Int?                    // Hit points (null for Trainer/Item cards)
+  imageUrl    String?                 // Card image
+  isEX        Boolean   @default(false) // Is it an EX card?
+  category    CardCategory            // Pokemon, Trainer, or Item
+
+  expansionId String
+  expansion   Expansion @relation(fields: [expansionId], references: [id])
+
+  packs       CardPack[]
+
+  owners      UserCard[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([expansionId, number])     // Card #001 is unique per expansion
+  @@index([expansionId])
+  @@index([rarity])
+  @@index([type])
+}
+
+model CardPack {
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id])
+
+  packId String
+  pack   Pack   @relation(fields: [packId], references: [id])
+
+  @@id([cardId, packId])
+  @@index([packId])
+}
+
+model User {
+  id        String     @id @default(cuid())
+  username  String     @unique
+  email     String?    @unique
+
+  cards     UserCard[]
+
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model UserCard {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cardId String
+  card   Card   @relation(fields: [cardId], references: [id])
+
+  quantity  Int  @default(1)
+
+  obtainedAt DateTime @default(now())
+
+  @@id([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+}
+
+enum Rarity {
+  COMMON            // ♦ (1 diamond)
+  UNCOMMON          // ♦♦ (2 diamonds)
+  RARE              // ♦♦♦ (3 diamonds)
+  DOUBLE_RARE       // ♦♦♦♦ (4 diamonds) — EX cards
+  ART_RARE          // ☆ (1 star)
+  SUPER_ART_RARE    // ☆☆ (2 stars)
+  IMMERSIVE_ART     // ☆☆☆ (3 stars)
+  CROWN_RARE        // 👑 (crown)
+}
+
+enum CardType {
+  GRASS
+  FIRE
+  WATER
+  LIGHTNING
+  PSYCHIC
+  FIGHTING
+  DARKNESS
+  METAL
+  DRAGON
+  COLORLESS
+}
+
+enum CardCategory {
+  POKEMON
+  TRAINER
+  ITEM
+  SUPPORTER
+}
